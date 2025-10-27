@@ -3,7 +3,8 @@
 #include "System.hpp"
 
 #if LINUX
-#   include "platform/linux/SerialCommunicator.hpp"
+#   include "platform/linux/LinuxSerialCommunicator.hpp"
+template <typename P> using SerialCommunicator = LinuxSerialCommunicator<P>;
 #else
-#   include "platform/windows/SerialCommunicator.hpp"
+#   include "platform/windows/WindowsSerialCommunicator.hpp"
 #endif

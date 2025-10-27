@@ -13,15 +13,15 @@
 #include "../../Packet.hpp"
 
 template<typename P>
-class SerialCommunicator : public ISerialCommunicator<P>
+class LinuxSerialCommunicator : public ISerialCommunicator<P>
 {
   public:
-    explicit SerialCommunicator(const std::string& devicePath)
+    explicit LinuxSerialCommunicator(const std::string& devicePath)
         : ISerialCommunicator<P>(devicePath),
           fd_(-1), running_(false), baud_(115200), stopBits_(1),
           parity_('N'), flowCtrl_(false), timeoutMs_(0) {}
 
-    ~SerialCommunicator() override
+    ~LinuxSerialCommunicator() override
     {
         stop();
     }

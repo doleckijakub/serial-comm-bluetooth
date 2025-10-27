@@ -1,0 +1,6 @@
+[submodule "vendor/stb"]
+	path = vendor/stb
+	url = https://github.com/nothings/stb
+[submodule "vendor/PDCurses"]
+	path = vendor/PDCurses
+	url = https://github.com/wmcbrine/PDCurses
