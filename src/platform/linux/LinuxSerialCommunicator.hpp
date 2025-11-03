@@ -76,7 +76,7 @@ class LinuxSerialCommunicator : public ISerialCommunicator<P>
         baud_ = baud;
         if (fd_ >= 0) configurePort();
     }
-    void setStopBits(uint8_t bits)
+    void setStopBits(char bits)
     {
         stopBits_ = bits;
         if (fd_ >= 0) configurePort();
@@ -119,18 +119,18 @@ class LinuxSerialCommunicator : public ISerialCommunicator<P>
     std::function<void(const P &)> callback_;
 
     uint32_t baud_;
-    uint8_t stopBits_;
+    char stopBits_;
     char parity_;
     bool flowCtrl_;
     uint32_t timeoutMs_;
 
     bool sendPacket(const P &pkt)
     {
-        std::vector<uint8_t> data = pkt.serialize();
+        std::vector<char> data = pkt.serialize();
         return writeAll(data.data(), data.size());
     }
 
-    bool writeAll(const uint8_t* buf, size_t len)
+    bool writeAll(const char* buf, size_t len)
     {
         size_t written = 0;
         while (written < len)
@@ -203,8 +203,8 @@ class LinuxSerialCommunicator : public ISerialCommunicator<P>
     void readLoop()
     {
         constexpr size_t BUF = 1024;
-        uint8_t tmp[BUF];
-        std::vector<uint8_t> buffer;
+        char tmp[BUF];
+        std::vector<char> buffer;
         while (running_)
         {
             ssize_t r = ::read(fd_, tmp, BUF);
