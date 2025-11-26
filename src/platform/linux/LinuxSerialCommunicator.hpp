@@ -28,7 +28,7 @@ class LinuxSerialCommunicator : public ISerialCommunicator<P>
 
     bool start() override
     {
-        fd_ = ::open(this->devicePath_.c_str(), O_RDWR | O_NOCTTY | O_NONBLOCK);
+        fd_ = ::open(this->devicePath_.c_str(), O_RDWR | O_NOCTTY);
         if (fd_ < 0)
         {
             std::perror("open");
