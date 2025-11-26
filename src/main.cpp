@@ -1,110 +1,136 @@
 #include <iostream>
 #include <fstream>
-#include <atomic>
-#include <thread>
-#include <unistd.h>
-#include <termios.h>
-#include <fcntl.h>
 #include <string>
+#include <cassert>
+#include <cstdlib>
 
 #include "SerialCommunicator.hpp"
-#include "Terminal.hpp"
 
-static char readCharNonBlocking() {
-    char c = 0;
-    ssize_t n = read(STDIN_FILENO, &c, 1);
-    if (n <= 0) return 0;
-    return c;
+#define next_arg() (assert(argc), --argc, *argv++)
+
+const char *prog;
+
+void usage() {
+    std::fprintf(stderr, "Usage: %s [OPTIONS] recv-file <filename> -- saves serial port output to file <filename>\n", prog);
+    std::fprintf(stderr, "       %s [OPTIONS] send-file <filename> -- sends file <filename> to serial port\n", prog);
+    std::fprintf(stderr, "Options:\n");
+    std::fprintf(stderr, "       -b <N> - sets the baud rate to N");
+#if LINUX
+    std::fprintf(stderr, "       -d <D> - sets the device to D (e.g. /dev/rfcomm0)");
+#elif WINDOWS
+    std::fprintf(stderr, "       -d <D> - sets the device to D (e.g. COM1)");
+#endif
+}
+
+static SerialCommunicator<Packet> *serial;
+
+void recv_file(int argc, char **argv) {
+    if (!argc) {
+        std::fprintf(stderr, "Error: Subcommand 'recv-file' requires a filename\n");
+        usage();
+        std::exit(1);
+    }
+
+    std::string filename = next_arg();
+
+    std::remove(filename.c_str());
+
+    serial->onReceive([&](const Packet &pkt) {
+        std::ofstream file(filename, std::ios::out | std::ios::binary | std::ios::app);
+        file.write(pkt.payload.data(), pkt.payload.size());
+        file.flush();
+
+        std::fprintf(stderr, "Recieved chunk %d / %d\n", pkt.header.chunkIndex + 1, pkt.header.totalChunks);
+
+        if (pkt.header.chunkIndex + 1 == pkt.header.totalChunks) {
+            std::exit(0);
+        }
+    });
+
+    serial->start();
+
+    while (true);
+}
+
+void send_file(int argc, char **argv) {
+    if (!argc) {
+        std::fprintf(stderr, "Error: Subcommand 'send-file' requires a filename\n");
+        usage();
+        std::exit(1);
+    }
+
+    std::string filename = next_arg();
+
+    serial->start();
+
+    std::ifstream file(filename, std::ios::binary);
+
+    if (!file) {
+        std::fprintf(stderr, "Error: Failed to open file: %s\n", filename.c_str());
+        std::exit(1);
+    }
+
+    std::vector<char> fileData((std::istreambuf_iterator<char>(file)),
+                                std::istreambuf_iterator<char>());
+
+    const auto chunks = chunk(fileData);
+
+    for (const auto pkt : chunks) {
+        *serial << pkt;
+    }
 }
 
 int main(int argc, char **argv)
 {
-    if (argc < 2) {
-        std::fprintf(stderr, "Usage: %s <DEVICE>\n", argv[0]);
-        return 1;
-    }
+    prog = next_arg();
 
-    auto term = std::make_unique<Terminal>();
-    if (!term->init()) {
-        std::fprintf(stderr, "Failed to initialize terminal.\n");
-        return 1;
-    }
+    std::function<void(int, char **)> handler = nullptr;
+    int baudRate = 600;
+    std::string device;
 
-    SerialCommunicator<Packet> serial(argv[1]);
-    serial.setBaudRate(115200);
-    std::atomic<bool> running = true;
-    std::string inputLine;
+    while (argc) {
+        std::string arg = next_arg();
 
-    serial.onReceive([&](const Packet &pkt) {
-        switch (pkt.type) {
-            case PacketType::STR:
-                term->addLine(" << " + pkt.str_data);
-                term->render();
-                break;
-            case PacketType::BIN:
-                term->addImage(pkt.bin_data);
-                term->render();
-                break;
-        }
-    });
-
-    serial.start();
-    term->addLine("Type messages or /quit to exit.");
-    term->render();
-
-    while (running) {
-        char ch = readCharNonBlocking();
-        if (ch) {
-            switch (ch) {
-                case '\n':
-                case '\r':
-                    if (inputLine == "/quit") {
-                        running = false;
-                        break;
-                    }
-                    else if (inputLine.starts_with("/img ")) {
-                        std::string filename = inputLine.substr(5);
-                        std::ifstream file(filename, std::ios::binary);
-                        if (!file) {
-                            term->addLine("Error: Failed to open file: " + filename);
-                            break;
-                        }
-                        std::vector<char> imageData((std::istreambuf_iterator<char>(file)),
-                                                    std::istreambuf_iterator<char>());
-
-                        Packet pkt{ .type = PacketType::BIN, .bin_data = imageData };
-                        serial << pkt;
-                        term->addImage(imageData);
-                    }
-                    else if (!inputLine.empty()) {
-                        Packet pkt{ .type = PacketType::STR, .str_data = inputLine };
-                        serial << pkt;
-                        term->addLine(" >> " + inputLine);
-                    }
-                    inputLine.clear();
-                    break;
-                case 127:
-                case '\b':
-                    if (!inputLine.empty()) inputLine.pop_back();
-                    break;
-                default:
-                    if (ch >= 32 && ch <= 126) inputLine.push_back(ch);
-                    break;
+        if (arg == "recv-file") {
+            handler = recv_file;
+            break;
+        } else if (arg == "send-file") {
+            handler = send_file;
+            break;
+        } else if (arg == "-b") {
+            if (!argc) {
+                std::fprintf(stderr, "Error: Flag '-b' requires a value\n");
+                usage();
+                return 1;
             }
-        }
 
-        term->render();
-        if (!inputLine.empty()) {
-            printf("%s", inputLine.c_str());
-            fflush(stdout);
-        }
+            const char *b = next_arg();
+            baudRate = atoi(b);
+        } else if (arg == "-d") {
+            if (!argc) {
+                std::fprintf(stderr, "Error: Flag '-d' requires a value\n");
+                usage();
+                return 1;
+            }
 
-        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+            device = next_arg();
+        } else {
+            std::fprintf(stderr, "Error: Argument '%s' not recognized\n", arg.c_str());
+            usage();
+            return 1;
+        }
     }
 
-    term->addLine("Goodbye!");
-    term->render();
-    serial.stop();
-    term->shutdown();
+    if (!handler) {
+        std::fprintf(stderr, "Error: No subcommand provided\n");
+        usage();
+        return 1;
+    }
+
+    serial = new SerialCommunicator<Packet>(device);
+    serial->setBaudRate(baudRate);
+
+    handler(argc, argv);
+
     return 0;
 }
