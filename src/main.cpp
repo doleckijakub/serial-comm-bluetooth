@@ -14,11 +14,11 @@ void usage() {
     std::fprintf(stderr, "Usage: %s [OPTIONS] recv-file <filename> -- saves serial port output to file <filename>\n", prog);
     std::fprintf(stderr, "       %s [OPTIONS] send-file <filename> -- sends file <filename> to serial port\n", prog);
     std::fprintf(stderr, "Options:\n");
-    std::fprintf(stderr, "       -b <N> - sets the baud rate to N");
+    std::fprintf(stderr, "       -b <N> - sets the baud rate to N\n");
 #if LINUX
-    std::fprintf(stderr, "       -d <D> - sets the device to D (e.g. /dev/rfcomm0)");
+    std::fprintf(stderr, "       -d <D> - sets the device to D (e.g. /dev/rfcomm0)\n");
 #elif WINDOWS
-    std::fprintf(stderr, "       -d <D> - sets the device to D (e.g. COM1)");
+    std::fprintf(stderr, "       -d <D> - sets the device to D (e.g. COM1)\n");
 #endif
 }
 
