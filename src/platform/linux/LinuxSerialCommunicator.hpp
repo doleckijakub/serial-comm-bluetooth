@@ -71,11 +71,62 @@ class LinuxSerialCommunicator : public ISerialCommunicator<P>
         return sendPacket(pkt);
     }
 
+    speed_t mapBaud(uint32_t baud)
+    {
+        switch (baud)
+        {
+            case 50: return B50;
+            case 75: return B75;
+            case 110: return B110;
+            case 134: return B134;
+            case 150: return B150;
+            case 200: return B200;
+            case 300: return B300;
+            case 600: return B600;
+            case 1200: return B1200;
+            case 1800: return B1800;
+            case 2400: return B2400;
+            case 4800: return B4800;
+            case 9600: return B9600;
+            case 19200: return B19200;
+            case 38400: return B38400;
+            case 57600: return B57600;
+            case 115200: return B115200;
+            case 230400: return B230400;
+            default:
+                std::fprintf(stderr, "Unsupported baud %u, using 115200\n", baud);
+                return B115200;
+        }
+    }
+
     void setBaudRate(uint32_t baud)
     {
+        if (baud_ == baud) return; // nothing to do
         baud_ = baud;
-        if (fd_ >= 0) configurePort();
+
+        if (fd_ >= 0)
+        {
+            // Attempt to apply new baud at runtime
+            struct termios tio {};
+            if (tcgetattr(fd_, &tio) != 0)
+            {
+                std::perror("tcgetattr");
+                return;
+            }
+            speed_t spd = mapBaud(baud_);
+            if (cfsetispeed(&tio, spd) != 0 || cfsetospeed(&tio, spd) != 0)
+            {
+                std::perror("cfsetispeed/cfsetospeed");
+                return;
+            }
+            if (tcsetattr(fd_, TCSANOW, &tio) != 0)
+            {
+                std::perror("tcsetattr");
+                std::fprintf(stderr, "Baud change may require reopening port\n");
+            }
+        }
     }
+
     void setStopBits(char bits)
     {
         stopBits_ = bits;
@@ -156,17 +207,11 @@ class LinuxSerialCommunicator : public ISerialCommunicator<P>
             return false;
         }
         cfmakeraw(&tio);
-        speed_t spd = B115200;
-        switch (baud_)
-        {
-            case 9600: spd = B9600; break;
-            case 19200: spd = B19200; break;
-            case 38400: spd = B38400; break;
-            case 57600: spd = B57600; break;
-            case 115200: spd = B115200; break;
-        }
+
+        speed_t spd = mapBaud(baud_);
         cfsetispeed(&tio, spd);
         cfsetospeed(&tio, spd);
+        
         tio.c_cflag &= ~CSTOPB;
         if (stopBits_ == 2) tio.c_cflag |= CSTOPB;
         tio.c_cflag &= ~(PARENB | PARODD);
