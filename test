@@ -65,6 +65,8 @@ void recv_file(int argc, char **argv) {
         }
     });
 
+    serial->start();
+
     while (true);
 }
 
@@ -76,6 +78,8 @@ void send_file(int argc, char **argv) {
     }
 
     std::string filename = next_arg();
+
+    serial->start();
 
     std::ifstream file(filename, std::ios::binary);
 
@@ -122,6 +126,8 @@ void send_image(int argc, char **argv) {
     bytes.insert(bytes.end(), img, img + w*h*4);
 
     stbi_image_free(img);
+
+    serial->start();
     const auto chunks = chunk(bytes);
 
     for (const auto &pkt : chunks)
@@ -216,6 +222,8 @@ void recv_image(int argc, char** argv) {
         }
     });
 
+    serial->start();
+
     while (true) sf::sleep(sf::milliseconds(10));
 }
 
@@ -275,7 +283,6 @@ int main(int argc, char **argv)
     }
 
     serial = new SerialCommunicator<Packet>(device);
-    serial->start();
     serial->setBaudRate(baudRate);
 
     handler(argc, argv);

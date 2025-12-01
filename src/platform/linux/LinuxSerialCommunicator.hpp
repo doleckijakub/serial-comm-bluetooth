@@ -28,8 +28,6 @@ class LinuxSerialCommunicator : public ISerialCommunicator<P>
 
     bool start() override
     {
-        std::fprintf("start");
-
         fd_ = ::open(this->devicePath_.c_str(), O_RDWR | O_NOCTTY);
         if (fd_ < 0)
         {
@@ -49,8 +47,6 @@ class LinuxSerialCommunicator : public ISerialCommunicator<P>
 
     void stop() override
     {
-        std::fprintf("stop");
-
         running_ = false;
         if (reader_.joinable()) reader_.join();
         if (fd_ >= 0)
