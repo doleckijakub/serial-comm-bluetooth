@@ -18,7 +18,7 @@ class LinuxSerialCommunicator : public ISerialCommunicator<P>
   public:
     explicit LinuxSerialCommunicator(const std::string& devicePath)
         : ISerialCommunicator<P>(devicePath),
-          fd_(-1), running_(false), baud_(115200), stopBits_(1),
+          fd_(-1), running_(false), baud_(600), stopBits_(1),
           parity_('N'), flowCtrl_(false), timeoutMs_(0) {}
 
     ~LinuxSerialCommunicator() override
@@ -28,6 +28,8 @@ class LinuxSerialCommunicator : public ISerialCommunicator<P>
 
     bool start() override
     {
+        std::fprintf("start");
+
         fd_ = ::open(this->devicePath_.c_str(), O_RDWR | O_NOCTTY);
         if (fd_ < 0)
         {
@@ -47,6 +49,8 @@ class LinuxSerialCommunicator : public ISerialCommunicator<P>
 
     void stop() override
     {
+        std::fprintf("stop");
+
         running_ = false;
         if (reader_.joinable()) reader_.join();
         if (fd_ >= 0)
@@ -106,6 +110,11 @@ class LinuxSerialCommunicator : public ISerialCommunicator<P>
 
         if (fd_ >= 0)
         {
+            speed_t spd = mapBaud(baud_);
+
+            stop();
+            start();
+
             // Attempt to apply new baud at runtime
             struct termios tio {};
             if (tcgetattr(fd_, &tio) != 0)
@@ -113,7 +122,7 @@ class LinuxSerialCommunicator : public ISerialCommunicator<P>
                 std::perror("tcgetattr");
                 return;
             }
-            speed_t spd = mapBaud(baud_);
+            
             if (cfsetispeed(&tio, spd) != 0 || cfsetospeed(&tio, spd) != 0)
             {
                 std::perror("cfsetispeed/cfsetospeed");
@@ -211,7 +220,7 @@ class LinuxSerialCommunicator : public ISerialCommunicator<P>
         speed_t spd = mapBaud(baud_);
         cfsetispeed(&tio, spd);
         cfsetospeed(&tio, spd);
-        
+
         tio.c_cflag &= ~CSTOPB;
         if (stopBits_ == 2) tio.c_cflag |= CSTOPB;
         tio.c_cflag &= ~(PARENB | PARODD);
