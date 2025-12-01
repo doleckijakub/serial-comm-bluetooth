@@ -5,5 +5,5 @@ set -xe
 g++ \
     -o bcp \
     -std=c++20 \
-    -Ivendor/stb \
+    -Ivendor \
     ./src/main.cpp
