@@ -101,7 +101,7 @@ class LinuxSerialCommunicator : public ISerialCommunicator<P>
 
     void setBaudRate(uint32_t baud)
     {
-        if (baud_ == baud) return; // nothing to do
+        if (baud_ == baud) return;
         baud_ = baud;
 
         if (fd_ >= 0)
@@ -111,7 +111,6 @@ class LinuxSerialCommunicator : public ISerialCommunicator<P>
             stop();
             start();
 
-            // Attempt to apply new baud at runtime
             struct termios tio {};
             if (tcgetattr(fd_, &tio) != 0)
             {
